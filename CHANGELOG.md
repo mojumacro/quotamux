@@ -4,6 +4,14 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] — 2026-07-29
+
+### Fixed
+- Project URLs now point at the current GitHub owner (`yandie-AI`). The 0.1.0 metadata
+  carries the previous owner name; PyPI metadata is immutable once published, so this
+  release supersedes it. Old links still redirect, but a redirect breaks if someone
+  claims the vacated username — hence the correction.
+
 ## [0.1.0] — 2026-07-29
 
 First public release.

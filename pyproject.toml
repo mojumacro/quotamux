@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "quotamux"
-version = "0.1.0"
+version = "0.1.1"
 description = "Route your coder to the subscription with the most quota left — multi-provider, multi-subscription quota scheduler."
 readme = "README.md"
 license = {file = "LICENSE"}
@@ -21,8 +21,8 @@ classifiers = [
 dependencies = ["PyYAML>=6.0"]
 
 [project.urls]
-Homepage = "https://github.com/mojumacro/quotamux"
-Issues = "https://github.com/mojumacro/quotamux/issues"
+Homepage = "https://github.com/yandie-AI/quotamux"
+Issues = "https://github.com/yandie-AI/quotamux/issues"
 
 [project.scripts]
 quotamux = "quotamux.cli:main"
