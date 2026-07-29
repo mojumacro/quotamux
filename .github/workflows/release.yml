@@ -1,0 +1,47 @@
+name: Release
+
+# 打 v* tag 即发布到 PyPI。
+# 用 PyPI Trusted Publishing（OIDC）——**不存任何 token**：PyPI 直接信任
+# 「从本仓库这个工作流跑出来的构建」，凭据全程不存在，也就无从泄漏。
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: |
+          python -m pip install --upgrade pip
+          pip install -e . pytest
+      - run: pytest tests/ -q          # 测试不过就不发布
+
+  publish:
+    needs: test
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write                  # Trusted Publishing 所需（换取 OIDC 令牌）
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Build
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build
+      - name: Verify tag matches package version
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG=$(ls dist/*.whl | sed -E 's/.*quotamux-([0-9.]+)-py3.*/\1/')
+          echo "tag=$TAG package=$PKG"
+          [ "$TAG" = "$PKG" ] || { echo "::error::tag $TAG ≠ package version $PKG"; exit 1; }
+      - uses: pypa/gh-action-pypi-publish@release/v1
