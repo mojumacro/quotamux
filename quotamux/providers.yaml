@@ -1,0 +1,138 @@
+# LLM 订阅额度注册表（声明式·加服务商/加订阅＝改本文件，不改代码）
+#
+# 结构：providers.<id>
+#   display   人读名
+#   usage     用量端点（缺省=该家不提供用量查询·按量计费类）
+#     url     支持 ${ENV} 与 ${ENV:-默认} 展开
+#     auth    bearer | x-api-key
+#     parse   两种模式覆盖已知两家，新家多半也落其一：
+#       mode: ratio    —— 服务端给 remaining/limit 绝对值，本模块算百分比
+#         week:   {remaining, limit, reset}          字段路径（点号分层）
+#         window: {list, remaining, limit}           限流窗列表（取最紧的一条）
+#       mode: percent  —— 服务端直接给百分比
+#         select: {path, where:{k:v}}                先从数组里挑一条
+#         week:   {pct, reset_ms}
+#         window: {pct}
+#   models    本服务商提供哪些模型（**选池的模型维度**）——
+#             id      真实模型 ID（写进 coder 的那个）
+#             aliases 好记的别名（`--model opus` 这类）
+#             usage_row  服务商**按模型分池**时，该模型对应用量返回体里的哪一行
+#                        （如 MiniMax 的 model_remains[].model_name）；不填=与订阅共用整体额度
+#   lane      给 coder 用的连接参数（本模块只产 env·不关心谁消费）
+#     base_url / model / auth_env（key 注入到哪个环境变量）/ extra（附加 env）
+#   subscriptions  同一服务商下的多个订阅，**各自独立额度池**
+#     name / keys（该订阅名下全部 key 的环境变量名·同池共享额度，查一把即代表全池）
+
+providers:
+  kimi:
+    display: Kimi Code
+    usage:
+      url: "${KIMI_CODE_BASE_URL:-https://api.kimi.com/coding/v1}/usages"
+      auth: bearer
+      parse:
+        mode: ratio
+        week: {remaining: "usage.remaining", limit: "usage.limit", reset: "usage.resetTime"}
+        window: {list: "limits", remaining: "detail.remaining", limit: "detail.limit"}
+    models:
+      - {id: "kimi-k3", aliases: [k3, kimi]}
+      - {id: "k3-256k", aliases: [k3-small]}
+      - {id: "kimi-for-coding", aliases: [k2.7, kfc]}
+    lane:
+      base_url: "https://api.kimi.com/coding"
+      model: "kimi-k3"
+      auth_env: ANTHROPIC_AUTH_TOKEN
+      extra: {CLAUDE_CODE_AUTO_COMPACT_WINDOW: "200000"}
+    # 示例：两个 Kimi 订阅（各自独立额度池）。同一订阅名下可列多把 key——它们**共享同一池**
+    # （实测同账号多把 key 用量读数逐位相同），故查一把即代表全池；撞窗换同池的另一把＝白换。
+    # 🔴 改成你自己的：写 ~/.quotamux/config.yaml（见 README），别改本文件。
+    subscriptions:
+      - name: "kimi-1"
+        keys: [KIMI_CODE_API_KEY]
+      - name: "kimi-2"
+        keys: [KIMI_CODE_API_KEY_2]
+
+  minimax:
+    display: MiniMax
+    usage:
+      url: "https://www.minimaxi.com/v1/token_plan/remains"
+      auth: bearer
+      parse:
+        mode: percent
+        select: {path: "model_remains", where: {model_name: "general"}}
+        week: {pct: "current_weekly_remaining_percent", reset_ms: "weekly_end_time"}
+        window: {pct: "current_interval_remaining_percent"}
+    models:
+      # MiniMax 用量返回体按模型分行（general/video…），故声明 usage_row：
+      # 取该模型自己那一行的余量，而不是订阅整体余量。
+      - {id: "MiniMax-M3", aliases: [m3, minimax], usage_row: general}
+      - {id: "MiniMax-M2.5", aliases: [m2.5], usage_row: general}
+    lane:
+      base_url: "https://api.minimaxi.com/anthropic"
+      model: "MiniMax-M3"
+      auth_env: ANTHROPIC_AUTH_TOKEN
+      extra: {CLAUDE_CODE_AUTO_COMPACT_WINDOW: "200000"}
+    subscriptions:
+      - name: "minimax-1"
+        keys: [MINIMAX_API_KEY]
+      - name: "minimax-2"
+        keys: [MINIMAX_API_KEY_2]
+
+  deepseek:
+    display: DeepSeek（按量·无订阅额度）
+    usage: null            # 按量计费无周池——余额监控另有 scripts/deepseek_balance_watch.py
+    models:
+      - {id: "deepseek-v4-pro[1m]", aliases: [deepseek, ds-pro]}
+      - {id: "deepseek-v4-flash", aliases: [ds-flash]}
+    lane:
+      base_url: "https://api.deepseek.com/anthropic"
+      model: "deepseek-v4-pro[1m]"
+      auth_env: ANTHROPIC_AUTH_TOKEN
+      extra: {ANTHROPIC_DEFAULT_HAIKU_MODEL: "deepseek-v4-flash", CLAUDE_CODE_AUTO_COMPACT_WINDOW: "200000"}
+    subscriptions:
+      - name: "deepseek"
+        keys: [DEEPSEEK_API_KEY]
+
+  anthropic:
+    display: Anthropic（Claude Max/Pro 订阅）
+    usage:
+      # 出处=Claude Code 二进制内嵌端点（strings 提取·与其 /usage 命令同源）。
+      # 返回 five_hour/seven_day 的 utilization(**已用**%)，故 mode=percent_used。
+      url: "https://api.anthropic.com/api/oauth/usage"
+      auth: bearer
+      headers: {anthropic-version: "2023-06-01"}
+      parse:
+        mode: percent_used
+        week: {used_pct: "seven_day.utilization", reset: "seven_day.resets_at"}
+        window: {used_pct: "five_hour.utilization"}
+    models:
+      - {id: "claude-opus-4-6", aliases: [opus]}
+      - {id: "claude-sonnet-4-6", aliases: [sonnet]}
+      - {id: "claude-haiku-4-5", aliases: [haiku]}
+    lane:
+      native: true          # 🔴 原生席：coder 什么都不设直接跑（注 base_url/AUTH_TOKEN
+                            #    会把 OAuth 降成 Bearer、订阅通道当场失效）
+    subscriptions:
+      - name: "claude-max"
+        keys: []            # OAuth 订阅：token 不在 env
+        key_source: {file: "~/.claude/.credentials.json", path: "claudeAiOauth.accessToken"}
+
+  openai:
+    display: OpenAI（Admin API 用量）
+    usage:
+      # 出处=OpenAI 平台 Admin API。⚠️ 未实测（本机无 OpenAI 订阅）——配置按官方文档写就，
+      # 首次接入者请核对返回体字段后校准 parse；无 key 时本模块自动跳过该池、不报错。
+      url: "https://api.openai.com/v1/organization/costs"
+      auth: bearer
+      parse:
+        mode: ratio
+        week: {remaining: "data.0.results.0.remaining", limit: "data.0.results.0.limit"}
+    models:
+      - {id: "gpt-5", aliases: [gpt5, openai]}
+      - {id: "gpt-5-mini", aliases: [gpt5-mini]}
+    lane:
+      base_url: "https://api.openai.com/v1"
+      model: "gpt-5"
+      auth_env: OPENAI_API_KEY
+    subscriptions:
+      - name: "openai-1"
+        keys: [OPENAI_ADMIN_KEY, OPENAI_API_KEY]

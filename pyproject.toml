@@ -1,0 +1,31 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "quotamux"
+version = "0.1.0"
+description = "Route your coder to the subscription with the most quota left — multi-provider, multi-subscription quota scheduler."
+readme = "README.md"
+license = {file = "LICENSE"}
+requires-python = ">=3.10"
+authors = [{name = "Yandie Intelligent Technology (Beijing) Co., Ltd."}]
+keywords = ["llm", "quota", "subscription", "rate-limit", "claude-code", "coding-agent", "scheduler"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3 :: Only",
+  "Topic :: Software Development :: Build Tools",
+]
+dependencies = ["PyYAML>=6.0"]
+
+[project.urls]
+Homepage = "https://github.com/mojumacro/quotamux"
+Issues = "https://github.com/mojumacro/quotamux/issues"
+
+[project.scripts]
+quotamux = "quotamux.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["quotamux"]
