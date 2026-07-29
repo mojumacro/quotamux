@@ -26,7 +26,6 @@ jobs:
   publish:
     needs: test
     runs-on: ubuntu-latest
-    environment: pypi
     permissions:
       id-token: write                  # Trusted Publishing 所需（换取 OIDC 令牌）
     steps:
