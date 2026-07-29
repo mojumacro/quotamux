@@ -157,6 +157,25 @@ Where a vendor reports quota **per model** (MiniMax returns one row per model), 
 per-model figure wins. A subscription can look 90 % free overall while the model you
 need is down to 5 %.
 
+## Spread: one seat per vendor (`--spread N`)
+
+Greedy `--pick` has a blind spot: dispatch three review agents in a row and **all three
+land on the same emptiest pool** — diverse prompts, same model. For cross-checking work
+(adversarial review, multi-model panels, N-version generation) model diversity *is* the
+point, and quota greed quietly destroys it.
+
+```bash
+quotamux --spread 3                 # 3 pools, all different vendors, emptiest first
+quotamux --spread 2 --model k3,m3   # per line: provider:subscription + model id
+```
+
+Within each vendor the best pool still wins (window-eligible, most weekly left); vendors
+are then ranked by quota and the top N returned — one line each, so a dispatcher can
+`readarray` and pin one seat per line. If fewer than N distinct vendors qualify you get
+fewer lines (and a note on stderr) — it never pads with a second pool from the same
+vendor, because that would *look* heterogeneous while reintroducing the very bias you
+asked it to remove.
+
 ## Selection rule
 
 1. If `--model` is given, drop pools that do not serve it. Weekly quota is worthless on

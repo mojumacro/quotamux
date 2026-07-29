@@ -4,6 +4,16 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] — 2026-07-30
+
+### Added
+- `pick_spread()` / `quotamux --spread N` — heterogeneous pool selection: up to N
+  pools from N **distinct vendors** (best pool within each vendor, vendors ranked
+  by remaining quota). For multi-model review panels and adversarial cross-checks,
+  where greedy `--pick` collapses every seat onto the single emptiest pool
+  (diverse prompts, same model). Never pads with a second pool from the same
+  vendor; honest shortfall + stderr note when fewer vendors qualify.
+
 ## [0.1.1] — 2026-07-29
 
 ### Fixed

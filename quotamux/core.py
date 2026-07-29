@@ -391,3 +391,33 @@ def pick(pools: list[Pool], min_window_pct: float = MIN_WINDOW_PCT,
             pool = [p for p in pool if p.serves(model)]
         return pool[0] if pool else None
     return None
+
+
+def pick_spread(pools: list[Pool], n: int = 2,
+                min_window_pct: float = MIN_WINDOW_PCT,
+                model: str | Sequence[str] | None = None) -> list[Pool]:
+    """异构分配：≤n 个池、**互不同服务商**——多席对抗/交叉评审的选池入口。
+
+    为什么单独一档：`pick` 的额度贪心会把同一批任务全部塌缩到余量王一家
+    （实弹：三席对抗验证经贪心选池全落同一 MiniMax 订阅——视角多样、模型同源，
+    交叉验证的独立性打折）。余量判据与多样性判据正交：单任务要"最空的池"，
+    多席任务要"每家出一席"。
+
+    判据：每服务商内先选自家最优池（窗合格、按 model 过滤、周剩最多），
+    再按周剩降序取前 n 家。不足 n 家时如实返回不足的数量——**绝不同家凑数**，
+    凑数会让调用方误以为拿到了异构分配。
+    """
+    best_of: dict[str, Pool] = {}
+    for p in pools:
+        if not p.ok or p.metered:
+            continue
+        if model and not p.serves(model):
+            continue
+        wk, win = p.quota_for(model)
+        if win is not None and win < min_window_pct:
+            continue
+        cur = best_of.get(p.provider)
+        if cur is None or (wk or 0) > (cur.quota_for(model)[0] or 0):
+            best_of[p.provider] = p
+    return sorted(best_of.values(),
+                  key=lambda p: p.quota_for(model)[0] or 0, reverse=True)[:n]

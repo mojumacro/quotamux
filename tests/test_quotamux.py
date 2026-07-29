@@ -5,8 +5,8 @@
    全流程（解析两种 mode、选池、产 coder env），证明代码不含任何服务商专属分支；
 ② **选池判据**：窗口有余量者中周剩最多者胜（治"一个订阅耗光、另一个一点没用"）；
    按量池默认不参选（花钱的兜底须显式 allow_metered）；
-③ **coder env 契约**：五个模型别名整族同切（漏一个＝子代理带原生模型名去打第三方
-   端点，401·生产实弹踩过）+ key 注入到该家声明的 auth_env。
+③ **coder env 契约**：五个模型别名整族同切（漏一个=子代理带原生模型名打第三方 401·
+   bin/aiarch 同族血账）+ key 注入到该家声明的 auth_env。
 """
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from quotamux import Pool, load_registry, pick  # noqa: E402
+from quotamux import Pool, load_registry, pick, pick_spread  # noqa: E402
 from quotamux.core import _parse, collect  # noqa: E402
 
 RATIO_PAYLOAD = {
@@ -345,3 +345,45 @@ def test_shipped_registry_declares_models():
         assert models, f"{pid} 未声明 models（--model 选池会漏掉它）"
         for m in models:
             assert m.get("id"), f"{pid} 有模型条目缺 id"
+
+
+# ── pick_spread：异构选池（多席对抗/交叉评审）────────────────────────────────
+# 实弹动机：三席对抗验证经贪心 pick 全落同一 MiniMax 订阅——视角多样但模型同源。
+# 余量判据与多样性判据正交：单任务要最空的池，多席任务要每家出一席。
+
+def _ppool(provider, name, week, win, models=None, metered=False, ok=True):
+    return Pool(provider=provider, name=name, keys=["K"], ok=ok, week_left=week,
+                window_left=win, metered=metered, models=models or [],
+                lane={"base_url": "https://b", "model": "m"})
+
+
+def test_spread_returns_distinct_providers_not_greedy():
+    """贪心会三席全给 minimax（余量王）；spread 必须每家一席。"""
+    pools = [_ppool("minimax", "mm-1", 90, 100), _ppool("minimax", "mm-2", 95, 100),
+             _ppool("kimi", "kimi-B", 46, 100), _ppool("kimi", "kimi-A", 7, 100)]
+    got = pick_spread(pools, n=2)
+    assert [p.provider for p in got] == ["minimax", "kimi"]
+    assert got[0].name == "mm-2" and got[1].name == "kimi-B", "每家内部仍取自家余量最优"
+
+
+def test_spread_never_pads_with_same_provider():
+    """只有 1 家可用时 n=3 也只给 1 个——同家凑数会伪装成异构分配。"""
+    pools = [_ppool("kimi", "kimi-A", 80, 100), _ppool("kimi", "kimi-B", 46, 100)]
+    got = pick_spread(pools, n=3)
+    assert len(got) == 1 and got[0].name == "kimi-A"
+
+
+def test_spread_respects_window_gate_and_metered_exclusion():
+    pools = [_ppool("kimi", "throttled", 99, 3),          # 窗告急=不可用
+             _ppool("deepseek", "payg", None, None, metered=True),
+             _ppool("minimax", "mm", 50, 100)]
+    got = pick_spread(pools, n=3)
+    assert [p.provider for p in got] == ["minimax"]
+
+
+def test_spread_filters_by_model_candidates():
+    pools = [_ppool("kimi", "kimi-B", 46, 100, models=A),
+             _ppool("minimax", "mm", 90, 100, models=B),
+             _ppool("anthropic", "max", 60, 100, models=C)]
+    got = pick_spread(pools, n=3, model=["k3", "m3"])
+    assert sorted(p.provider for p in got) == ["kimi", "minimax"], "不提供候选模型的家不入席"

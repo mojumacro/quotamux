@@ -13,6 +13,10 @@
                   --model k3,m3 = 这组候选**都行**（如"kimi 或 minimax 均可"），
                                   提供任一者即入选，再跨服务商挑余量最多的
                 多值按给定顺序表示偏好：同池同时提供多个候选时用排在前面的
+  --spread N    **异构选池**：给 N 个互不同服务商的池（每行一个
+                `provider:订阅名 [模型id]`）。多席对抗/交叉评审用——
+                贪心 --pick 会把同批任务全塌到余量王一家（模型同源=独立性打折），
+                本档保证每家出一席；不足 N 家如实少给，绝不同家凑数
   --provider X  限定服务商   --min-window N  限流窗余量门槛(默认15)
   --allow-metered  允许回落按量计费池   --fresh  绕过缓存实时查
 退出码: 0=有可用池 1=全部告急（应排队等窗，别加订阅）
@@ -23,7 +27,7 @@ import argparse
 import json
 import sys
 
-from .core import collect, pick
+from .core import collect, pick, pick_spread
 
 
 def _table(pools, best, model=None) -> None:
@@ -52,6 +56,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--export", action="store_true")
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--model", help="模型或候选列表（逗号分隔）——见 --help 三档语义")
+    ap.add_argument("--spread", type=int, metavar="N",
+                    help="异构选池：N 个互不同服务商的池，每行一个（多席对抗用）")
     ap.add_argument("--provider")
     ap.add_argument("--min-window", type=float, default=15.0)
     ap.add_argument("--allow-metered", action="store_true")
@@ -68,6 +74,15 @@ def main(argv: list[str] | None = None) -> int:
         pools = [p for p in pools if p.serves(want) or p.metered]
     best = pick(pools, a.min_window, a.allow_metered, model=want)
 
+    if a.spread:
+        got = pick_spread(pools, a.spread, a.min_window, model=want)
+        for p in got:
+            hit = p.serves(want) if want else None
+            print(f"{p.provider}:{p.name}" + (f" {hit.get('id')}" if hit else ""))
+        if len(got) < a.spread:
+            print(f"# only {len(got)}/{a.spread} distinct providers available",
+                  file=sys.stderr)
+        return 0 if got else 1
     if a.json:
         print(json.dumps([p.as_dict(redact=not a.no_redact) for p in pools],
                          ensure_ascii=False, indent=2, default=str))
