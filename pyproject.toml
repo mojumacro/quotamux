@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "quotamux"
-version = "0.2.0"
+version = "0.2.1"
 description = "Route your coder to the subscription with the most quota left — multi-provider, multi-subscription quota scheduler."
 readme = "README.md"
 license = {file = "LICENSE"}

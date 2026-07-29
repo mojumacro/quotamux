@@ -76,6 +76,55 @@ providers:
 
 Point elsewhere with `QUOTAMUX_CONFIG=/path/to/config.yaml`.
 
+## Using it with Claude Code
+
+One line — `--export` emits shell-ready `export` statements, so `eval` them and start Claude Code:
+
+```bash
+eval "$(quotamux --export --model k3,m3)" && claude
+```
+
+What lands in the environment (real output, key redacted):
+
+```
+export ANTHROPIC_BASE_URL='https://api.kimi.com/coding'
+export ANTHROPIC_MODEL='kimi-k3'
+export ANTHROPIC_AUTH_TOKEN='sk-…'
+export ANTHROPIC_DEFAULT_OPUS_MODEL='kimi-k3'
+export ANTHROPIC_DEFAULT_SONNET_MODEL='kimi-k3'
+export ANTHROPIC_DEFAULT_HAIKU_MODEL='kimi-k3'
+export CLAUDE_CODE_SUBAGENT_MODEL='kimi-k3'
+```
+
+The whole **model-alias family** is switched together, not just `ANTHROPIC_MODEL`. That is
+deliberate: miss one and a subagent will send a native Anthropic model name to the
+third-party endpoint and get a 401 that is annoying to trace back.
+
+### Can a subscription produce an `ANTHROPIC_AUTH_TOKEN`?
+
+Depends which kind of subscription — and the difference matters:
+
+**Third-party subscriptions with an Anthropic-compatible endpoint** (Kimi, MiniMax, …): **yes**,
+and that is exactly the intended path. The subscription hands you an API key; the endpoint
+accepts it as `ANTHROPIC_AUTH_TOKEN` alongside `ANTHROPIC_BASE_URL`. `--export` does this for you.
+
+**An Anthropic first-party subscription** (Claude Max / Pro): **no — and you should not try.**
+Its credential is an OAuth access token (in `~/.claude/.credentials.json`), and Claude Code
+already uses it natively. Injecting it as `ANTHROPIC_AUTH_TOKEN` (with a `BASE_URL`) makes
+Claude Code treat the session as a third-party Bearer call, and the subscription channel breaks —
+we shipped that bug before adding the guard for it. So such pools are declared `native: true`,
+and `--export` deliberately emits **nothing** for them, just a note on stderr:
+
+```
+$ quotamux --export --provider anthropic
+# anthropic:claude-max is a native subscription — run your coder with no env override
+```
+
+quotamux still reads that OAuth token, but only to call the usage endpoint so your Max quota
+shows up in the same table as everything else. It is never emitted as an environment variable.
+
+Rule of thumb: **third-party subscription → env injection; first-party subscription → touch nothing.**
+
 ## Supported providers
 
 | Provider | Weekly | Rate window | Usage endpoint |

@@ -4,6 +4,16 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] — 2026-07-30
+
+### Documentation
+- Added a **Using it with Claude Code** section: the one-line `eval "$(quotamux --export)"`
+  recipe, why the whole model-alias family is switched at once, and a FAQ answering
+  *"can a subscription produce an `ANTHROPIC_AUTH_TOKEN`?"* — yes for third-party
+  Anthropic-compatible subscriptions, **no** for an Anthropic first-party subscription
+  (OAuth; injecting it downgrades the session to Bearer and breaks the subscription channel,
+  which is why such pools are `native: true` and export nothing).
+
 ## [0.2.0] — 2026-07-30
 
 ### Added
