@@ -255,6 +255,14 @@ asked it to remove.
   launching a batch of workers does not hammer the usage endpoints.
 - `quotamux --json` is stable machine output; build your own policy on top of it.
 
+## Also from us
+
+[**crossexamine**](https://github.com/yandie-AI/crossexamine) — your coding agent writes its own
+summary of what it did; of course it looks fine. `crossexamine` puts its raw session transcript in
+front of models from other vendors and lets them veto the commit. Same stack, other half of the
+problem: quotamux decides *which* model runs your agent, crossexamine decides whether to trust what
+it did.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
